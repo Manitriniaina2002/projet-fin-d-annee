@@ -1,0 +1,120 @@
+networks:
+  siac-network:
+    external: true
+
+volumes:
+  mosquitto_data:
+  influxdb_data:
+  grafana_data:
+  nodered_data:
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto_secure
+    restart: unless-stopped
+    ports:
+      - "11883:1883"
+      - "18883:8883"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - mosquitto_data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+      - ./mosquitto/certs:/mosquitto/certs
+    networks:
+      - siac-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "1883"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  nodered:
+    image: nodered/node-red:latest
+    container_name: nodered_secure
+    restart: unless-stopped
+    ports:
+      - "11880:1880"
+    volumes:
+      - ./nodered:/data
+      - ./suricata/logs:/suricata-logs:ro
+    networks:
+      - siac-network
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1880"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  influxdb:
+    image: influxdb:2
+    container_name: influxdb
+    restart: unless-stopped
+    ports:
+      - "18086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=password
+      - DOCKER_INFLUXDB_INIT_ORG=siac
+      - DOCKER_INFLUXDB_INIT_BUCKET=bucket_iot
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=siac-token
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - ./influxdb/config:/etc/influxdb2
+    networks:
+      - siac-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "13000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=password
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - siac-network
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/login"]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
+
+  # Suricata IDS - Commented out due to Docker networking limitations on Windows
+  # For Windows: Install Suricata natively or use WSL2
+  # See suricata/SURICATA-SETUP.md for instructions
+  # suricata:
+  #   image: jasonish/suricata:latest
+  #   container_name: suricata_ids
+  #   restart: unless-stopped
+  #   cap_add:
+  #     - NET_ADMIN
+  #     - NET_RAW
+  #   networks:
+  #     - siac-network
+  #   volumes:
+  #     - ./suricata/rules:/var/lib/suricata/rules:ro
+  #     - ./suricata/logs:/var/log/suricata
+  #   command: -i eth0 --set rule-files[0]=/var/lib/suricata/rules/siac-iot.rules -v

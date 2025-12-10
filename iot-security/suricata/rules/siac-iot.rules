@@ -1,0 +1,103 @@
+# SIAC-IoT Custom Suricata Rules for IoT Security Monitoring
+# Updated: December 10, 2025
+
+# ===================================================================
+# MQTT Protocol Security Rules
+# ===================================================================
+
+# Detect MQTT connections without TLS
+alert tcp any any -> any 1883 (msg:"SIAC-IoT: Unencrypted MQTT Connection Detected"; flow:to_server,established; content:"|10|"; depth:1; classtype:policy-violation; sid:1000001; rev:1;)
+
+# Detect MQTT connection attempts with invalid protocol
+alert tcp any any -> any [1883,8883] (msg:"SIAC-IoT: MQTT Invalid Protocol Version"; flow:to_server,established; content:"|10|"; depth:1; content:!"|04|"; offset:1; depth:1; classtype:protocol-command-decode; sid:1000002; rev:1;)
+
+# Detect MQTT large payload (possible DoS)
+alert tcp any any -> any [1883,8883] (msg:"SIAC-IoT: MQTT Large Payload Detected"; flow:established; dsize:>65535; classtype:attempted-dos; sid:1000003; rev:1;)
+
+# Detect MQTT publish flooding
+alert tcp any any -> any [1883,8883] (msg:"SIAC-IoT: MQTT Publish Flooding"; flow:to_server,established; content:"|30|"; threshold:type both, track by_src, count 100, seconds 10; classtype:attempted-dos; sid:1000004; rev:1;)
+
+# ===================================================================
+# IoT Device Anomaly Detection
+# ===================================================================
+
+# Detect ESP32 connecting to unexpected MQTT broker
+alert tcp $HOME_NET any -> !$HOME_NET [1883,8883] (msg:"SIAC-IoT: ESP32 Connecting to External MQTT Broker"; flow:to_server; classtype:policy-violation; sid:1000010; rev:1;)
+
+# Detect unusual port scanning from IoT devices
+alert tcp $HOME_NET any -> any any (msg:"SIAC-IoT: Port Scan from IoT Device"; flags:S; threshold:type both, track by_src, count 20, seconds 5; classtype:attempted-recon; sid:1000011; rev:1;)
+
+# Detect high data exfiltration from IoT device
+alert tcp $HOME_NET any -> any any (msg:"SIAC-IoT: High Data Transfer from IoT Device"; flow:to_server; threshold:type threshold, track by_src, count 1000, seconds 60; classtype:policy-violation; sid:1000012; rev:1;)
+
+# ===================================================================
+# Network Security Rules
+# ===================================================================
+
+# Detect SSH brute force attempts
+alert tcp any any -> $HOME_NET 22 (msg:"SIAC-IoT: SSH Brute Force Attempt"; flow:to_server,established; threshold:type both, track by_src, count 5, seconds 60; classtype:attempted-admin; sid:1000020; rev:1;)
+
+# Detect Telnet usage (insecure protocol)
+alert tcp any any -> any 23 (msg:"SIAC-IoT: Telnet Connection Detected (Insecure)"; flow:to_server,established; classtype:policy-violation; sid:1000021; rev:1;)
+
+# Detect FTP usage (insecure file transfer)
+alert tcp any any -> any 21 (msg:"SIAC-IoT: FTP Connection Detected (Insecure)"; flow:to_server,established; classtype:policy-violation; sid:1000022; rev:1;)
+
+# ===================================================================
+# Malware & Attack Detection
+# ===================================================================
+
+# Detect Mirai botnet scanner (IoT malware)
+alert tcp any any -> $HOME_NET any (msg:"SIAC-IoT: Mirai Botnet Scanner Detected"; flow:to_server; content:"busybox"; nocase; classtype:trojan-activity; sid:1000030; rev:1;)
+
+# Detect Mirai default credentials attempt
+alert tcp any any -> $HOME_NET 23 (msg:"SIAC-IoT: Mirai Default Credential Attempt"; flow:to_server; content:"admin"; nocase; content:"admin"; distance:0; classtype:attempted-admin; sid:1000031; rev:1;)
+
+# Detect suspicious shell commands from web interface
+alert http any any -> $HOME_NET any (msg:"SIAC-IoT: Suspicious Command Injection Attempt"; flow:to_server; content:"/bin/sh"; http_uri; classtype:web-application-attack; sid:1000032; rev:1;)
+
+# ===================================================================
+# InfluxDB Security Rules
+# ===================================================================
+
+# Detect unauthorized InfluxDB access attempts
+alert tcp any any -> any 8086 (msg:"SIAC-IoT: Unauthorized InfluxDB Access Attempt"; flow:to_server; content:"POST"; http_method; content:"/api/v2/write"; http_uri; threshold:type both, track by_src, count 10, seconds 60; classtype:attempted-admin; sid:1000040; rev:1;)
+
+# Detect InfluxDB query injection
+alert tcp any any -> any 8086 (msg:"SIAC-IoT: Potential InfluxDB Injection"; flow:to_server; content:"DROP"; nocase; http_uri; classtype:web-application-attack; sid:1000041; rev:1;)
+
+# ===================================================================
+# API Security Rules
+# ===================================================================
+
+# Detect API authentication failures
+alert http any any -> $HOME_NET 8000 (msg:"SIAC-IoT: API Authentication Failure"; flow:to_server; content:"401"; http_stat_code; threshold:type both, track by_src, count 5, seconds 60; classtype:attempted-admin; sid:1000050; rev:1;)
+
+# Detect SQL injection attempts
+alert http any any -> $HOME_NET 8000 (msg:"SIAC-IoT: SQL Injection Attempt"; flow:to_server; pcre:"/(\%27)|(\')|(\-\-)|(\%23)|(#)/i"; http_uri; classtype:web-application-attack; sid:1000051; rev:1;)
+
+# Detect XSS attempts
+alert http any any -> $HOME_NET any (msg:"SIAC-IoT: Cross-Site Scripting (XSS) Attempt"; flow:to_server; content:"<script"; nocase; http_uri; classtype:web-application-attack; sid:1000052; rev:1;)
+
+# ===================================================================
+# Docker Network Security
+# ===================================================================
+
+# Detect unauthorized container-to-container communication
+alert tcp $DOCKER_NET any -> $DOCKER_NET any (msg:"SIAC-IoT: Suspicious Inter-Container Communication"; flow:to_server; threshold:type both, track by_src, count 100, seconds 10; classtype:policy-violation; sid:1000060; rev:1;)
+
+# Detect Docker API unauthorized access
+alert tcp any any -> any 2375 (msg:"SIAC-IoT: Unauthorized Docker API Access"; flow:to_server; classtype:attempted-admin; sid:1000061; rev:1;)
+
+# ===================================================================
+# DDoS Protection Rules
+# ===================================================================
+
+# Detect SYN flood attack
+alert tcp any any -> $HOME_NET any (msg:"SIAC-IoT: SYN Flood Attack Detected"; flags:S; threshold:type both, track by_dst, count 100, seconds 10; classtype:attempted-dos; sid:1000070; rev:1;)
+
+# Detect UDP flood
+alert udp any any -> $HOME_NET any (msg:"SIAC-IoT: UDP Flood Attack Detected"; threshold:type both, track by_dst, count 200, seconds 10; classtype:attempted-dos; sid:1000071; rev:1;)
+
+# Detect ICMP flood
+alert icmp any any -> $HOME_NET any (msg:"SIAC-IoT: ICMP Flood Attack Detected"; threshold:type both, track by_dst, count 50, seconds 10; classtype:attempted-dos; sid:1000072; rev:1;)

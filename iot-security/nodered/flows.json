@@ -1,0 +1,423 @@
+[
+    {
+        "id": "da03eddac687fe72",
+        "type": "tab",
+        "label": "Flux Node-RED",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "mqtt_tls_profile",
+        "type": "tls-config",
+        "name": "TLS CA Config",
+        "cert": "",
+        "key": "",
+        "ca": "/data/ca.crt",
+        "certname": "",
+        "keyname": "",
+        "caname": "",
+        "servername": "",
+        "verifyservercert": false,
+        "alpnprotocol": ""
+    },
+    {
+        "id": "mqtt_broker_secure",
+        "type": "mqtt-broker",
+        "name": "Mosquitto TLS",
+        "broker": "mosquitto_secure",
+        "port": "8883",
+        "tls": "mqtt_tls_profile",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": true,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "influxdb_conn",
+        "type": "influxdb",
+        "hostname": "http://influxdb",
+        "port": "8086",
+        "protocol": "http",
+        "database": "",
+        "name": "InfluxDB 2.0",
+        "usetls": false,
+        "tls": "",
+        "influxdbVersion": "2.0",
+        "url": "http://192.168.1.187:8086",
+        "timeout": "",
+        "rejectUnauthorized": true
+    },
+    {
+        "id": "508bb1a5518358d8",
+        "type": "influxdb",
+        "hostname": "influxdb",
+        "port": "8086",
+        "protocol": "http",
+        "database": "database",
+        "name": "InfluxDB v2.0",
+        "usetls": false,
+        "tls": "",
+        "influxdbVersion": "2.0",
+        "url": "http://influxdb:8086",
+        "timeout": "10",
+        "rejectUnauthorized": true,
+        "token": "siac-token"
+    },
+    {
+        "id": "mqtt_input_esp32",
+        "type": "mqtt in",
+        "z": "da03eddac687fe72",
+        "name": "ESP32 Secure MQTT",
+        "topic": "iot/data/esp32",
+        "qos": "0",
+        "datatype": "auto",
+        "broker": "mqtt_broker_secure",
+        "nl": false,
+        "rap": false,
+        "rh": 0,
+        "inputs": 0,
+        "x": 140,
+        "y": 220,
+        "wires": [
+            [
+                "420f21f6c2cba4a0",
+                "debug_output"
+            ]
+        ]
+    },
+    {
+        "id": "debug_output",
+        "type": "debug",
+        "z": "da03eddac687fe72",
+        "name": "Debug all",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1460,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "420f21f6c2cba4a0",
+        "type": "json",
+        "z": "da03eddac687fe72",
+        "name": "Parse JSON",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 350,
+        "y": 420,
+        "wires": [
+            [
+                "312d856ff329f7a7",
+                "c41bd4f7cb2d7ccd"
+            ]
+        ]
+    },
+    {
+        "id": "312d856ff329f7a7",
+        "type": "function",
+        "z": "da03eddac687fe72",
+        "name": "Alert logic",
+        "func": "// msg.payload = { temp, hum, distance }\nlet p = msg.payload || {};\nlet t = parseFloat(p.temp);\nlet h = parseFloat(p.hum);\nlet d = parseFloat(p.distance);\n\n// thresholds (modifiable)\nconst TEMP_HIGH = 30.0;\nconst TEMP_LOW = 20.0;\nconst HUM_HIGH = 80.0;\nconst DIST_ALERT = 10.0; // cm\n\nlet alerts = {\n  tempHigh: !isNaN(t) && t > TEMP_HIGH,\n  tempLow: !isNaN(t) && t < TEMP_LOW,\n  humHigh: !isNaN(h) && h > HUM_HIGH,\n  distanceAlert: !isNaN(d) && d < DIST_ALERT\n};\n\nmsg.payload_in = {temperature: t, humidity: h, distance: d};\nmsg.alerts = alerts;\nnode.status({fill: alerts.tempHigh||alerts.humHigh||alerts.distanceAlert?\"red\":\"green\",shape:\"dot\",text:`T:${t} H:${h} D:${d}`});\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 540,
+        "y": 380,
+        "wires": [
+            [
+                "61a2323bb52c6905",
+                "9bf33a165b5d09f7"
+            ]
+        ]
+    },
+    {
+        "id": "c41bd4f7cb2d7ccd",
+        "type": "function",
+        "z": "da03eddac687fe72",
+        "name": "Format measurements for Influx",
+        "func": "// produce msg.payload as object for InfluxDBv2 node\nlet p = msg.payload || {};\nlet t = parseFloat(p.temp);\nlet h = parseFloat(p.hum);\nlet d = parseFloat(p.distance);\nif (isNaN(t) && isNaN(h) && isNaN(d)) return null;\n\nmsg.payload = {\n  _measurement: \"sensor_measurements\",\n  device: \"esp32\",\n  temperature: isNaN(t)? undefined : t,\n  humidity: isNaN(h)? undefined : h,\n  distance: isNaN(d)? undefined : d\n};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 610,
+        "y": 500,
+        "wires": [
+            [
+                "eda974a602cd5314"
+            ]
+        ]
+    },
+    {
+        "id": "61a2323bb52c6905",
+        "type": "function",
+        "z": "da03eddac687fe72",
+        "name": "Format alert for Influx",
+        "func": "// if any alert true -> write event\nlet a = msg.alerts || {};\nlet p = msg.payload_in || {};\nlet any = a.tempHigh||a.tempLow||a.humHigh||a.distanceAlert;\nif (!any) return null;\n\nmsg.payload = {\n  _measurement: \"alert_events\",\n  device: \"esp32\",\n  temp: p.temperature,\n  hum: p.humidity,\n  distance: p.distance,\n  tempHigh: a.tempHigh?1:0,\n  tempLow: a.tempLow?1:0,\n  humHigh: a.humHigh?1:0,\n  distanceAlert: a.distanceAlert?1:0,\n  message: (\n    a.tempHigh?\"Temp HIGH\" : (a.humHigh?\"Hum HIGH\" : (a.distanceAlert?\"Distance ALERT\" : \"\"))\n  )\n};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 780,
+        "y": 340,
+        "wires": [
+            [
+                "d5564adb87ed73d7"
+            ]
+        ]
+    },
+    {
+        "id": "9bf33a165b5d09f7",
+        "type": "function",
+        "z": "da03eddac687fe72",
+        "name": "Decide LED command",
+        "func": "// Builds JSON command {red:0/1, green:0/1}\nlet a = msg.alerts;\nlet cmd = {red:0, green:1};\nif (a.tempHigh || a.humHigh || a.distanceAlert) { cmd.red = 1; cmd.green = 0; }\nelse if (a.tempLow) { cmd.red = 0; cmd.green = 1; }\nelse { cmd.red = 0; cmd.green = 1; }\n\nmsg.topic = \"iot/cmd/led\";\nmsg.payload = JSON.stringify(cmd);\n// attach a copy for history\nmsg.command_record = {time: new Date().toISOString(), command: cmd};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 780,
+        "y": 420,
+        "wires": [
+            [
+                "6f5652e820ccc293",
+                "c30684cd31f77fc8"
+            ]
+        ]
+    },
+    {
+        "id": "6f5652e820ccc293",
+        "type": "mqtt out",
+        "z": "da03eddac687fe72",
+        "name": "MQTT -> iot/cmd/led",
+        "topic": "",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "mqtt_broker_secure",
+        "x": 1080,
+        "y": 380,
+        "wires": []
+    },
+    {
+        "id": "c30684cd31f77fc8",
+        "type": "function",
+        "z": "da03eddac687fe72",
+        "name": "Format command history for Influx",
+        "func": "let rec = msg.command_record || {};\nmsg.payload = {\n  _measurement: \"command_history\",\n  device: \"esp32\",\n  cmd_red: rec.command?rec.command.red:0,\n  cmd_green: rec.command?rec.command.green:0,\n  ts: rec.time\n};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1120,
+        "y": 440,
+        "wires": [
+            [
+                "55aeae074e156b65"
+            ]
+        ]
+    },
+    {
+        "id": "d5564adb87ed73d7",
+        "type": "influxdb out",
+        "z": "da03eddac687fe72",
+        "influxdb": "508bb1a5518358d8",
+        "name": "InfluxDB Write - alerts",
+        "measurement": "alerts",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "siac",
+        "bucket": "bucket_iot",
+        "x": 1100,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "eda974a602cd5314",
+        "type": "influxdb out",
+        "z": "da03eddac687fe72",
+        "influxdb": "508bb1a5518358d8",
+        "name": "InfluxDB Write - measurements",
+        "measurement": "measurements",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "siac",
+        "bucket": "bucket_iot",
+        "x": 1030,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "55aeae074e156b65",
+        "type": "influxdb out",
+        "z": "da03eddac687fe72",
+        "influxdb": "508bb1a5518358d8",
+        "name": "InflusxDB Write - commands",
+        "measurement": "commands",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "siac",
+        "bucket": "bucket_iot",
+        "x": 1520,
+        "y": 500,
+        "wires": []
+    },
+    {
+        "id": "9d125bdbba38f94b",
+        "type": "tail-file",
+        "z": "da03eddac687fe72",
+        "filename": "/suricata-logs/eve.json",
+        "createFile": false,
+        "mode": "lines",
+        "encoding": "utf8",
+        "split": true,
+        "separator": "",
+        "fromBeginning": false,
+        "flushAtEOF": false,
+        "rememberLast": false,
+        "limitSize": false,
+        "maxBytes": "",
+        "skipBlank": true,
+        "useTrim": true,
+        "sendError": true,
+        "interval": "",
+        "name": "Tail Suricata eve.json",
+        "x": 160,
+        "y": 700,
+        "wires": [
+            [
+                "c716e8a2e91718d6"
+            ]
+        ]
+    },
+    {
+        "id": "c716e8a2e91718d6",
+        "type": "json",
+        "z": "da03eddac687fe72",
+        "name": "Parse JSON",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 410,
+        "y": 700,
+        "wires": [
+            [
+                "17c9beef05f63bec"
+            ]
+        ]
+    },
+    {
+        "id": "17c9beef05f63bec",
+        "type": "function",
+        "z": "da03eddac687fe72",
+        "name": "Filtrer alertes",
+        "func": "if (!msg.payload || msg.payload.event_type !== \"alert\") return null;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 650,
+        "y": 700,
+        "wires": [
+            [
+                "27baa5263e35823b",
+                "00a32ad5f009d991"
+            ]
+        ]
+    },
+    {
+        "id": "00a32ad5f009d991",
+        "type": "debug",
+        "z": "da03eddac687fe72",
+        "name": "Suricata ALERTS",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "complete": "payload",
+        "targetType": "json",
+        "x": 900,
+        "y": 760,
+        "wires": []
+    },
+    {
+        "id": "27baa5263e35823b",
+        "type": "function",
+        "z": "da03eddac687fe72",
+        "name": "Format InfluxDB",
+        "func": "let e = msg.payload;\nlet a = e.alert;\n\nmsg.payload = {\n    _measurement: \"suricata_alerts\",\n    signature: a.signature || \"unknown\",\n    severity: Number(a.severity) || 0,\n    sid: a.signature_id,\n    rev: a.rev,\n    action: a.action,\n    src_ip: e.src_ip,\n    src_port: e.src_port,\n    dest_ip: e.dest_ip,\n    dest_port: e.dest_port,\n    proto: e.proto,\n    count: 1\n};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 900,
+        "y": 700,
+        "wires": [
+            [
+                "bc126a9d5afb76c4"
+            ]
+        ]
+    },
+    {
+        "id": "bc126a9d5afb76c4",
+        "type": "influxdb out",
+        "z": "da03eddac687fe72",
+        "influxdb": "508bb1a5518358d8",
+        "name": "InfluxDB Write - suricata_alerts",
+        "measurement": "suricata_alerts",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "siac",
+        "bucket": "bucket_iot",
+        "x": 1250,
+        "y": 700,
+        "wires": []
+    }
+]

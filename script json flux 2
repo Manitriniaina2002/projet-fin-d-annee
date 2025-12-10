@@ -1,0 +1,166 @@
+[
+    {
+        "id": "e1dfff7e24d77cf5",
+        "type": "tail-file",
+        "z": "f618ad068f56d102",
+        "filename": "/suricata-logs/eve.json",
+        "createFile": false,
+        "mode": "lines",
+        "encoding": "utf8",
+        "split": true,
+        "separator": "",
+        "fromBeginning": false,
+        "flushAtEOF": false,
+        "rememberLast": false,
+        "limitSize": false,
+        "skipBlank": true,
+        "useTrim": true,
+        "sendError": true,
+        "name": "Tail Suricata eve.json",
+        "x": 120,
+        "y": 180,
+        "wires": [
+            [
+                "f696495d03736eb7",
+                "fc0fc3dbb2744e22"
+            ]
+        ]
+    },
+    {
+        "id": "f696495d03736eb7",
+        "type": "json",
+        "z": "f618ad068f56d102",
+        "name": "Parse JSON",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 370,
+        "y": 180,
+        "wires": [
+            [
+                "55c8c8ff6c12adf0"
+            ]
+        ]
+    },
+    {
+        "id": "55c8c8ff6c12adf0",
+        "type": "function",
+        "z": "f618ad068f56d102",
+        "name": "Filtrer alertes",
+        "func": "if (!msg.payload || msg.payload.event_type !== \"alert\") return null;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 610,
+        "y": 180,
+        "wires": [
+            [
+                "2461a7bfb8cab486"
+            ]
+        ]
+    },
+    {
+        "id": "fc0fc3dbb2744e22",
+        "type": "debug",
+        "z": "f618ad068f56d102",
+        "name": "Suricata ALERTS",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "complete": "payload",
+        "targetType": "json",
+        "x": 860,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "2461a7bfb8cab486",
+        "type": "function",
+        "z": "f618ad068f56d102",
+        "name": "Format InfluxDB",
+        "func": "let e = msg.payload;\nlet a = e.alert;\n\nmsg.payload = {\n    _measurement: \"suricata_alerts\",\n    signature: a.signature || \"unknown\",\n    severity: Number(a.severity) || 0,\n    sid: a.signature_id,\n    rev: a.rev,\n    action: a.action,\n    src_ip: e.src_ip,\n    src_port: e.src_port,\n    dest_ip: e.dest_ip,\n    dest_port: e.dest_port,\n    proto: e.proto,\n    count: 1\n};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 860,
+        "y": 180,
+        "wires": [
+            [
+                "71cfbcd517f6fe72"
+            ]
+        ]
+    },
+    {
+        "id": "1d814cc97b02b008",
+        "type": "influxdb out",
+        "z": "f618ad068f56d102",
+        "influxdb": "influxdb_conn",
+        "name": "InfluxDB — Suricata Alerts",
+        "measurement": "suricata_alerts",
+        "precision": "s",
+        "retentionPolicy": "",
+        "database": "",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "platform_iot",
+        "bucket": "bucket_iot",
+        "x": 1140,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "71cfbcd517f6fe72",
+        "type": "influxdb out",
+        "z": "f618ad068f56d102",
+        "influxdb": "508bb1a5518358d8",
+        "name": "InfluxDB Write - suricata_alerts",
+        "measurement": "suricata_alerts",
+        "precision": "",
+        "retentionPolicy": "",
+        "database": "database",
+        "precisionV18FluxV20": "ms",
+        "retentionPolicyV18Flux": "",
+        "org": "platform_iot",
+        "bucket": "bucket_iot",
+        "x": 1190,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "influxdb_conn",
+        "type": "influxdb",
+        "hostname": "http://influxdb",
+        "port": "8086",
+        "protocol": "http",
+        "database": "",
+        "name": "InfluxDB 2.0",
+        "usetls": false,
+        "tls": "",
+        "influxdbVersion": "2.0",
+        "url": "http://192.168.1.187:8086",
+        "timeout": "",
+        "rejectUnauthorized": true
+    },
+    {
+        "id": "508bb1a5518358d8",
+        "type": "influxdb",
+        "hostname": "127.0.0.1",
+        "port": 8086,
+        "protocol": "http",
+        "database": "database",
+        "name": "InfluxDB v2.0",
+        "usetls": false,
+        "tls": "",
+        "influxdbVersion": "2.0",
+        "url": "http://influxdb:8086",
+        "timeout": 10,
+        "rejectUnauthorized": true
+    },
+    {
+        "id": "9fd0151ed5380b69",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-contrib-tail-file": "1.2.6",
+            "node-red-contrib-influxdb": "0.7.0"
+        }
+    }
+]
