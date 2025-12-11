@@ -2,52 +2,95 @@
 
 ## Project Overview
 
-SIAC-IoT is a modular IoT security and monitoring platform integrating:
-- Suricata IDS for network intrusion detection
-- InfluxDB for time-series data storage
-- Node-RED for event processing
-- FastAPI backend for ML anomaly detection and REST API
-- React frontend for dashboards and alert management
-- ESP32 and sensor integration for real-world telemetry
+SIAC-IoT is a comprehensive IoT security and monitoring platform that combines network intrusion detection, machine learning-based anomaly detection, and real-time sensor monitoring. The platform provides:
 
-## Current Status (December 2025)
+- **Network Security**: Suricata IDS for real-time intrusion detection
+- **Data Storage**: InfluxDB time-series database for efficient data management
+- **Event Processing**: Node-RED for automated alert processing and routing
+- **ML Intelligence**: FastAPI backend with IsolationForest anomaly detection
+- **Modern Dashboard**: React frontend with real-time monitoring and analytics
+- **IoT Integration**: ESP32 sensor devices with MQTT telemetry
+- **Visualization**: Grafana dashboards for comprehensive data analysis
 
-### ✅ Features Implemented
-- Suricata IDS alerts (10,000+ events) with full field display and pagination
-- ML anomaly detection (IsolationForest) with 30+ test alerts, realistic device scenarios
-- ML-powered recommendations: context-aware, multi-path, safety/security actions
-- Alert recommendations shown in modal dialogs (not toasts) for better UX
-- Pagination for both ML alerts and recommendations (3 items per page)
-- Device metadata and location displayed in recommendations
-- Backend queries fixed (manual aggregation, no pivot errors)
-- Frontend UI: modern, color-coded, responsive
-- ESP32 MQTT integration ready for deployment
+## Current Status (December 11, 2025)
 
-### ⚠️ In Progress / Known Issues
-- MQTT client initialization error (connection reset by peer)
-- Some alerts may have similar recommendations if reasons are generic
-- Hardware integration (ESP32) pending final field test
-- Further ML model tuning possible for more granular recommendations
+### ✅ Production Ready Features
+- **ESP32 Integration**: Full end-to-end telemetry pipeline (ESP32 → MQTT → Backend → InfluxDB → Frontend)
+- **Real-time Monitoring**: Auto-refresh dashboard updates every 5 seconds
+- **Suricata IDS**: 10,000+ network alerts with full field display and pagination
+- **ML Anomaly Detection**: IsolationForest model with 30+ test scenarios
+- **Smart Recommendations**: Context-aware, multi-path security actions with modal dialogs
+- **IoT Dashboard**: Live sensor data display with temperature, humidity, distance metrics
+- **Sensor Trends**: Interactive charts with Recharts showing historical sensor data
+- **Device Management**: Comprehensive metadata, location, and status tracking
+- **MQTT Support**: Non-TLS and TLS-enabled broker configurations
+- **Modern UI**: Responsive design with Tailwind CSS, color-coded alerts, French localization
 
-### 🛠️ How to Run
-1. `docker-compose up` (all services: backend, frontend, InfluxDB, Suricata, Node-RED)
-2. Generate ML alerts: `docker exec siac-backend python generate_ml_alerts.py -c 20`
-3. Access dashboard: [http://localhost:5173](http://localhost:5173)
-4. Backend API: [http://localhost:18000/docs](http://localhost:18000/docs)
+### 🔧 Technical Improvements
+- Fixed MQTT TLS configuration (respects `MQTT_TLS_ENABLED` environment variable)
+- Corrected ESP32 JSON payload format (`sensors` and `net` structure)
+- Fixed InfluxDB query pivot aggregation for multi-field time-series data
+- Resolved frontend data access patterns (nested sensors/net objects)
+- Enhanced chart visibility (3px strokes, 5px dots, auto-scaling axes)
+- Removed WebSocket event loop conflicts for stable MQTT processing
+- Added comprehensive console debugging with emoji markers
+- Cleaned up duplicate sensor displays
+
+### 🛠️ Quick Start
+
+```sh
+# 1. Navigate to the web application directory
+cd project-root/web-application
+
+# 2. Start all services (backend, frontend, InfluxDB, Postgres)
+docker-compose up -d
+
+# 3. Optionally start IoT security stack (Mosquitto, Node-RED, Suricata, Grafana)
+cd ../iot-security
+docker-compose -f docker-compose.iot.yml up -d
+
+# 4. Generate test ML alerts (optional)
+docker exec siac-backend python generate_ml_alerts.py -c 20
+
+# 5. Access the dashboard
+# Frontend: http://localhost:5173
+# Backend API: http://localhost:18000/docs
+# Grafana: http://localhost:3000
+```
+
+### 📡 ESP32 Setup
+
+```arduino
+// Configure in code_esp32.ino:
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
+const char* mqtt_server = "YOUR_BACKEND_IP";
+const int mqtt_port = 11883;  // Non-TLS MQTT port
+
+// Upload to ESP32:
+// 1. Open Arduino IDE
+// 2. Load iot-security/esp32/code_esp32/code_esp32.ino
+// 3. Install libraries: WiFi, PubSubClient, DHT
+// 4. Select board: ESP32 Dev Module
+// 5. Upload and monitor serial output
+```
 
 ### 📁 Key Directories
+
 - `web-application/backend/app/` — FastAPI, ML, InfluxDB service
 - `web-application/frontend/src/pages/` — React dashboards, modals
-- `iot-security/` — Suricata, Node-RED, InfluxDB config
-- `infra/` — Grafana, Mosquitto, Postgres, Suricata rules
+- `iot-security/` — Mosquitto, Node-RED, Suricata, InfluxDB, Grafana
+- `integration/` — Full stack docker-compose configuration
 
 ### 👨‍💻 Contributors
-- Tanjona (Lead Developer)
-- GitHub Copilot (AI Assistant)
+
+RANDRIAMBOLOLONA Manitriniaina Louis Josilde
+ANDRIATSITOHAINA Faly Jean Antonio Downavan
+---
 
 ## Project Structure
 
-```
+```text
 project-root/
 ├── README.md
 ├── integration/
@@ -89,20 +132,19 @@ project-root/
 ### Prerequisites
 
 - Docker & Docker Compose installed
-- (Optional) ESP32 device for real telemetry
+- (Optional) ESP32 device with DHT22 sensor and HC-SR04 ultrasonic sensor
+- (Optional) Arduino IDE for ESP32 programming
 
 ### Quick Start
 
 ```sh
-# 1. Clone the repository
-# 2. Navigate to the main project directory
+# 1. Navigate to web application directory
 cd project-root/web-application
 
-# 3. Start all services (backend, frontend, InfluxDB, Suricata, Node-RED)
-docker-compose up
+# 2. Start all services
+docker-compose up -d
 
-# 4. Generate ML alerts for demo/testing
-# (in another terminal)
+# 3. Generate test ML alerts (optional)
 docker exec siac-backend python generate_ml_alerts.py -c 20
 ```
 
@@ -131,49 +173,36 @@ docker exec siac-backend python generate_ml_alerts.py -c 20
 - Modal displays priority, urgency, root cause analysis, and actionable steps
 
 ### 4. Test Suricata IDS Alerts
+
 - Suricata network alerts are shown on the **IDS Alerts** page
 - Includes full details, device info, and pagination
 
-### 5. Advanced
+### 5. IoT Monitoring
+
+- Navigate to **Monitoring IoT** page
+- View real-time ESP32 sensor data (temperature, humidity, distance)
+- Check sensor trend charts with auto-refresh every 5 seconds
+- Monitor device status, network traffic, and LED indicators
+
+### 6. Advanced Features
+
 - Access API docs at [http://localhost:18000/docs](http://localhost:18000/docs)
 - View time-series data in Grafana ([http://localhost:3000](http://localhost:3000))
 - Edit Suricata rules in `infra/suricata/rules/siac-iot.rules`
-- Integrate real ESP32 devices via MQTT (see `iot-security/esp32/code_esp32/`)
+- Integrate real ESP32 devices via MQTT (see ESP32 Setup section above)
 
 ---
-For troubleshooting, see the Troubleshooting section above or check container logs with `docker logs siac-backend --tail 50`.
 
-## Usage Guide
+## Key Features
 
-### 1. Prerequisites
-- Docker & Docker Compose installed
-- (Optional) ESP32 device for real telemetry
-
-### 2. Quick Start
-```sh
-# Start all services
-cd project-root/web-application
-# Launch backend, frontend, InfluxDB, Suricata, Node-RED
-# (edit docker-compose.full.yml for full stack)
-docker-compose up
-
-# Generate ML alerts for testing
-# (in another terminal)
-docker exec siac-backend python generate_ml_alerts.py -c 20
-```
-
-### 3. Accessing the Platform
-- **Frontend Dashboard:** [http://localhost:5173](http://localhost:5173)
-- **Backend API Docs:** [http://localhost:18000/docs](http://localhost:18000/docs)
-- **Grafana:** [http://localhost:3000](http://localhost:3000)
-- **Node-RED:** [http://localhost:1880](http://localhost:1880)
-
-### 4. Main Features
-- **IDS Alerts:** Suricata network events, paginated, with full details
-- **ML Alerts:** Anomaly detection, recommendations modal, pagination
-- **Recommendations:** Context-aware, safety/security actions, modal display
-- **Device Management:** Metadata, location, and type shown in UI
-- **ESP32 Integration:** MQTT telemetry, real device support
+- **Real-time IoT Monitoring**: Live sensor data with auto-refresh every 5 seconds, interactive trend charts
+- **IDS Alerts**: Suricata network events with full details, pagination, and device tracking
+- **ML Anomaly Detection**: IsolationForest-based detection with confidence scores
+- **Smart Recommendations**: Context-aware security actions with priority levels and root cause analysis
+- **Device Management**: Comprehensive metadata, location tracking, and status monitoring
+- **ESP32 Integration**: Full MQTT telemetry pipeline with TLS and non-TLS support
+- **Modern Dashboard**: Responsive React UI with Tailwind CSS, French localization
+- **Data Visualization**: Grafana dashboards and Recharts for time-series analysis
 
 ### 5. Development
 - **Backend:** FastAPI, Python, InfluxDB client
@@ -249,60 +278,219 @@ SIAC-IoT is composed of several microservices and infrastructure components:
 - Datasources: `provisioning/datasources/influxdb.yml`
 
 ### Mosquitto MQTT
-- Location: `infra/mosquitto/`
+
+- Location: `infra/mosquitto/` and `iot-security/mosquitto/`
 - Config: `config/mosquitto.conf`, TLS certs in `certs/`
+- Ports: 11883 (non-TLS), 18883 (TLS)
 - Used for ESP32 telemetry ingestion
 
 ### ESP32 Integration
+
 - Code: `iot-security/esp32/code_esp32/code_esp32.ino`
-- Sensors: DHT22, ultrasonic, servo
-- MQTT topics: `iot/telemetry/{device_id}`
-- TLS support: Certificates in `iot-security/mosquitto/certs/`
-- Data sent: temperature, humidity, distance, etc.
+- Sensors: DHT22 (temperature/humidity), HC-SR04 (ultrasonic distance)
+- MQTT Topic: `devices/{device_id}/telemetry` (e.g., `devices/ESP32-001/telemetry`)
+- Payload Format:
+```json
+{
+  "sensors": {
+    "temperature": 28.2,
+    "humidity": 99.9,
+    "distance": 1204,
+    "motion": false
+  },
+  "net": {
+    "tx_bytes": 0,
+    "rx_bytes": 0,
+    "connections": 0
+  }
+}
+```
+- Configuration: WiFi SSID/password, MQTT broker IP, port (11883 for non-TLS)
+- Publishing interval: Every 5 seconds
 
 ## Data Flow
 
-1. **Telemetry**: ESP32 devices → Mosquitto MQTT → Node-RED → InfluxDB
-2. **IDS Alerts**: Suricata → Node-RED → InfluxDB
-3. **ML Alerts**: Backend queries InfluxDB, runs anomaly detection, stores results in `alerts` measurement
-4. **Recommendations**: Backend analyzes ML alerts, generates context-aware recommendations
-5. **Frontend**: Fetches alerts, recommendations, device info via REST API
-6. **Visualization**: Grafana dashboards for time-series analytics
+1. **ESP32 Telemetry**: ESP32 → Mosquitto MQTT (port 11883) → Backend MQTT Client → InfluxDB `telemetry` measurement
+2. **ML Anomaly Detection**: Backend processes telemetry → IsolationForest model → Stores anomalies in InfluxDB `alerts` measurement
+3. **Suricata IDS**: Network traffic → Suricata EVE JSON → Node-RED → InfluxDB `suricata_alerts` measurement
+4. **Smart Recommendations**: Backend analyzes anomalies → Context-aware recommendations with priority and actions
+5. **Frontend Dashboard**: REST API → Fetches telemetry, alerts, recommendations → Auto-refresh every 5 seconds
+6. **Visualization**: Recharts (frontend trends) + Grafana (time-series analytics)
+
+### Real-time Pipeline
+
+```
+ESP32 (5s interval) 
+  ↓ MQTT publish (devices/ESP32-001/telemetry)
+Mosquitto Broker (11883)
+  ↓ MQTT subscribe (devices/+/telemetry)
+Backend MQTT Client
+  ↓ process_telemetry() 
+  ├→ Save to InfluxDB (telemetry measurement)
+  ├→ ML anomaly detection (IsolationForest)
+  └→ Generate recommendations (if anomaly)
+      ↓
+InfluxDB Storage
+  ↓ REST API (/api/v1/telemetry/recent)
+React Frontend
+  ↓ Auto-refresh (5s)
+User Dashboard (IoT Monitoring page)
+```
 
 ## ML System
-- Model: IsolationForest (unsupervised anomaly detection)
-- Training: Simulated normal data, retrain via `/api/v1/ml/train`
-- Features: temperature, humidity, tx_bytes, rx_bytes, connections
-- Alert generation: `generate_ml_alerts.py` script for test/demo data
-- Recommendations: Multi-path, context-aware, based on alert reason and severity
+
+- **Model**: IsolationForest (scikit-learn, unsupervised anomaly detection)
+- **Training**: Simulated normal data, retrain via `/api/v1/ml/train` endpoint
+- **Features**: `temperature`, `humidity`, `distance`, `tx_bytes`, `rx_bytes`, `connections`
+- **Detection**: Real-time scoring on each telemetry message, anomaly score > 0.5 triggers alert
+- **Recommendations Engine**: Context-aware analysis based on:
+  - Alert reason (temperature spike, network anomaly, humidity, etc.)
+  - Severity level (low, medium, high, critical)
+  - Device metadata (type, location)
+  - Multi-path actions (immediate, short-term, long-term)
+- **Testing**: `generate_ml_alerts.py` script creates diverse test scenarios
 
 ## Environment Variables
-- Set in Docker Compose or `.env` files
-- Example:
-  - `INFLUXDB_URL=http://influxdb:8086`
-  - `INFLUXDB_TOKEN=siac-token`
-  - `INFLUXDB_ORG=siac`
-  - `INFLUXDB_BUCKET=bucket_iot`
+
+Backend configuration (set in `docker-compose.yml` or `.env`):
+
+```env
+# InfluxDB
+INFLUXDB_URL=http://influxdb:8086
+INFLUXDB_TOKEN=siac-token
+INFLUXDB_ORG=siac
+INFLUXDB_BUCKET=bucket_iot
+
+# MQTT
+MQTT_BROKER=mosquitto_secure
+MQTT_PORT=11883
+MQTT_TLS_ENABLED=false
+MQTT_CA_CERT=/app/certs/ca.crt
+
+# Database
+DATABASE_URL=postgresql://user:password@postgres:5432/siac_iot
+```
 
 ## Troubleshooting
-- Backend API not responding: `docker logs siac-backend --tail 50`
-- InfluxDB issues: Check `iot-security/influxdb/config/influx-configs`
-- MQTT connection errors: Verify `infra/mosquitto/config/mosquitto.conf` and TLS certs
-- Suricata rules: Edit `infra/suricata/rules/siac-iot.rules`
-- Node-RED flows: Check `iot-security/nodered/flows.json`
-- ML alerts not showing: Ensure backend is running and ML model is trained
 
-## Demo Walkthrough
+### Common Issues
 
-1. **Start all services**: `docker-compose up`
-2. **Generate ML alerts**: `docker exec siac-backend python generate_ml_alerts.py -c 20`
-3. **Open dashboard**: [http://localhost:5173](http://localhost:5173)
-4. **View ML alerts**: Go to Alerts page, use pagination
-5. **Open recommendations**: Click Analyser on any alert for modal with AI actions
-6. **Test IDS alerts**: Go to IDS Alerts page for Suricata events
-7. **View Grafana analytics**: [http://localhost:3000](http://localhost:3000)
-8. **API docs**: [http://localhost:18000/docs](http://localhost:18000/docs)
-9. **Integrate ESP32**: Flash code, connect to WiFi, verify MQTT telemetry in dashboard
+**Backend API not responding:**
+```sh
+docker logs siac-backend --tail 50
+docker-compose restart backend
+```
+
+**MQTT connection errors:**
+- Check `MQTT_TLS_ENABLED` environment variable matches broker configuration
+- Verify broker is running: `docker ps | grep mosquitto`
+- Check mosquitto logs: `docker logs mosquitto_secure --tail 50`
+- For non-TLS: Use port 11883, set `MQTT_TLS_ENABLED=false`
+- For TLS: Use port 18883, set `MQTT_TLS_ENABLED=true`, ensure certs exist
+
+**ESP32 not sending data:**
+- Check serial monitor for WiFi connection status
+- Verify MQTT broker IP address in `code_esp32.ino`
+- Ensure port is 11883 for non-TLS
+- Check backend logs for "MQTT message received" or "Telemetry saved"
+
+**Frontend not displaying data:**
+- Check browser console (F12) for errors
+- Verify backend API is accessible: `curl http://localhost:18000/health`
+- Check InfluxDB has data: Visit Grafana at `http://localhost:3000`
+- Look for console logs with emoji markers (📊, 📈, ⚠️, ❌)
+
+**InfluxDB query issues:**
+- Verify InfluxDB token in environment variables
+- Check bucket name matches: `bucket_iot`
+- Review `influxdb/config/influx-configs` for configuration
+
+**Chart not displaying:**
+- Open browser console (F12) and check for "📊 Telemetry data for chart"
+- Verify sensorData array has items with proper format
+- Check Y-axis scaling (auto-scaling enabled)
+- Ensure at least 2 data points exist for trend lines
+
+**Suricata rules:**
+- Edit `infra/suricata/rules/siac-iot.rules` for custom detection rules
+- Restart Suricata container after rule changes
+
+**Node-RED flows:**
+- Check `iot-security/nodered/flows.json` for flow configuration
+- Access Node-RED UI at `http://localhost:1880` for debugging
 
 ---
-For further details, see documentation in each subfolder and API docs. Contributions and feedback welcome!
+
+## Project Highlights
+
+### Technical Stack
+
+- **Backend**: FastAPI, Python 3.9+, paho-mqtt, scikit-learn, SQLAlchemy
+- **Frontend**: React 18, Vite, Tailwind CSS, Recharts
+- **Database**: InfluxDB 2.x (time-series), PostgreSQL (relational)
+- **Messaging**: Mosquitto MQTT Broker
+- **IDS**: Suricata with custom rules
+- **Visualization**: Grafana, Recharts
+- **Hardware**: ESP32, DHT22, HC-SR04
+- **DevOps**: Docker, Docker Compose
+
+### Performance
+
+- Real-time telemetry processing (5-second intervals)
+- Auto-refresh dashboard (5-second updates)
+- Efficient time-series queries with InfluxDB Flux
+- Responsive UI with optimized React components
+- Scalable microservices architecture
+
+### Security Features
+
+- Network intrusion detection (Suricata IDS)
+- ML-based anomaly detection (IsolationForest)
+- MQTT TLS support for encrypted communications
+- Context-aware security recommendations
+- Real-time alert notifications
+
+---
+
+## Contributing
+
+This project was developed as part of the SIAC-IoT initiative. Contributions, issues, and feature requests are welcome!
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## License
+
+This project is part of an academic initiative. See individual component licenses for details.
+
+---
+
+## Acknowledgments
+
+- **Development**: Tanjona (Lead Developer)
+- **AI Assistance**: GitHub Copilot
+- **Technologies**: FastAPI, React, InfluxDB, Suricata, Mosquitto, Grafana
+- **Hardware**: ESP32 community and Arduino ecosystem
+
+---
+
+## Contact & Support
+
+For questions, issues, or collaboration opportunities:
+- Create an issue in the GitHub repository
+- Review the documentation in each subfolder
+- Check API docs at `http://localhost:18000/docs`
+
+**Last Updated**: December 11, 2025
+**Version**: 1.0 (Production Ready)
+
+---
+
+*Built with ❤️ for IoT Security and Monitoring*

@@ -4,21 +4,21 @@
 #include <DHT.h>
 
 // ======================================================
-// 🔧 CONFIGURATION WIFI
+// 🔧 WIFI
 // ======================================================
-const char *ssid = "*.*";
+const char *ssid = "Box_Wifi";
 const char *password = "AFJAD@2002!";
 
 // ======================================================
-// 🔐 CONFIG MQTT TLS
+// 🔐 MQTT TLS
 // ======================================================
-const char *mqtt_server = "192.168.43.198"; // Host machine IP address
-const int mqtt_port = 18883;                // TLS port mapped to host
+const char *mqtt_server = "192.168.1.136";
+const int mqtt_port = 18883;
 const char *mqtt_user = "esp32";
 const char *mqtt_pass = "admin123";
 
 // ======================================================
-// 📌 CERTIFICAT CA - Updated December 10, 2025
+// 📌 CERTIFICAT CA
 // ======================================================
 static const char ca_cert[] PROGMEM = R"EOF(
 -----BEGIN CERTIFICATE-----
@@ -57,7 +57,7 @@ WDS2JbYmXg==
 )EOF";
 
 // ======================================================
-// 📌 DHT22 CONFIG
+// 📌 DHT22
 // ======================================================
 #define DHTPIN 15
 #define DHTTYPE DHT22
@@ -70,7 +70,7 @@ DHT dht(DHTPIN, DHTTYPE);
 #define LED_VERTE 5
 
 // ======================================================
-// 📌 HC‑SR04
+// 📌 HC-SR04
 // ======================================================
 #define TRIG 27
 #define ECHO 26
@@ -86,17 +86,23 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
   String msg = "";
   for (int i = 0; i < length; i++)
     msg += (char)payload[i];
-
   msg.trim();
+
+  Serial.print("📩 MQTT -> ");
+  Serial.print(topic);
+  Serial.print(" : ");
+  Serial.println(msg);
 
   if (String(topic) == "iot/cmd/led_rouge")
   {
-    digitalWrite(LED_ROUGE, (msg == "ON") ? HIGH : LOW);
+    digitalWrite(LED_ROUGE, msg == "ON");
+    Serial.println(msg == "ON" ? "🔴 LED ROUGE ON" : "🔴 LED ROUGE OFF");
   }
 
   if (String(topic) == "iot/cmd/led_verte")
   {
-    digitalWrite(LED_VERTE, (msg == "ON") ? HIGH : LOW);
+    digitalWrite(LED_VERTE, msg == "ON");
+    Serial.println(msg == "ON" ? "🟢 LED VERTE ON" : "🟢 LED VERTE OFF");
   }
 }
 
@@ -105,9 +111,19 @@ void mqttCallback(char *topic, byte *payload, unsigned int length)
 // ======================================================
 void setup_wifi()
 {
+  Serial.println("\n📡 Connexion au WiFi...");
   WiFi.begin(ssid, password);
+
   while (WiFi.status() != WL_CONNECTED)
+  {
     delay(300);
+    Serial.print(".");
+  }
+
+  Serial.println("\n📶 WiFi connecté !");
+  Serial.print("👉 Adresse IP : ");
+  Serial.println(WiFi.localIP());
+  Serial.println("=====================================");
 }
 
 // ======================================================
@@ -117,23 +133,23 @@ void reconnect()
 {
   while (!client.connected())
   {
+    Serial.println("🔁 Tentative de connexion MQTT...");
     if (client.connect("ESP32Client", mqtt_user, mqtt_pass))
     {
-
-      // ABONNEMENTS ICI 👇
-      client.subscribe("iot/#");
+      Serial.println("🟢 Connecté au Broker MQTT !");
       client.subscribe("iot/cmd/led_rouge");
       client.subscribe("iot/cmd/led_verte");
     }
     else
     {
+      Serial.println("⚠️ MQTT non connecté, nouvelle tentative...");
       delay(2000);
     }
   }
 }
 
 // ======================================================
-// 📏 MESURE HC-SR04
+// 📏 LECTURE DISTANCE
 // ======================================================
 float readDistance()
 {
@@ -142,6 +158,7 @@ float readDistance()
   digitalWrite(TRIG, HIGH);
   delayMicroseconds(10);
   digitalWrite(TRIG, LOW);
+
   long duration = pulseIn(ECHO, HIGH);
   return duration * 0.0343 / 2;
 }
@@ -152,6 +169,9 @@ float readDistance()
 void setup()
 {
   Serial.begin(115200);
+  Serial.println("🔌 Initialisation ESP32...");
+  Serial.println("=====================================");
+
   pinMode(LED_ROUGE, OUTPUT);
   pinMode(LED_VERTE, OUTPUT);
   pinMode(TRIG, OUTPUT);
@@ -183,17 +203,28 @@ void loop()
     float hum = dht.readHumidity();
     float dist = readDistance();
 
-    // LED automatique selon distance
-    digitalWrite(LED_ROUGE, dist < 20 ? HIGH : LOW);
-    digitalWrite(LED_VERTE, dist >= 20 ? HIGH : LOW);
+    if (isnan(temp) || isnan(hum))
+    {
+      Serial.println("❌ Erreur capteur DHT22 !");
+      return;
+    }
 
-    // Publication JSON
+    digitalWrite(LED_ROUGE, dist < 20);
+    digitalWrite(LED_VERTE, dist >= 20);
+
+    // 🖥️ AFFICHAGE SERIE COMPLET
+    Serial.println("===== 📊 Mesures =====");
+    Serial.print("🌡 Température : "); Serial.println(temp);
+    Serial.print("💧 Humidité    : "); Serial.println(hum);
+    Serial.print("📏 Distance    : "); Serial.println(dist);
+    Serial.println("======================");
+
+    // JSON MQTT
     char payload[150];
     snprintf(payload, sizeof(payload),
              "{\"temp\": %.2f, \"hum\": %.2f, \"distance\": %.2f}",
              temp, hum, dist);
 
     client.publish("iot/data/esp32", payload);
-    Serial.println(payload);
   }
 }
